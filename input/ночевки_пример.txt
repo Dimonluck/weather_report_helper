@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="http://nakarte.me" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" version="1.1">
+	<metadata>
+		<time>2026-07-12T06:18:25.837Z</time>
+	</metadata>
+	<wpt lat="42.415040" lon="72.285580">
+		<name>мс21-07</name>
+	</wpt>
+	<wpt lat="42.211771" lon="72.422909">
+		<name>мс22-07</name>
+	</wpt>
+	<wpt lat="41.604583" lon="73.029174">
+		<name>мс25-07</name>
+	</wpt>
+</gpx>

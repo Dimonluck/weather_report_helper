@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="http://nakarte.me" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" version="1.1">
+	<metadata>
+		<time>2026-07-12T06:08:42.877Z</time>
+	</metadata>
+	<wpt lat="42.427077" lon="75.032978">
+		<name>пер Кегеты</name>
+	</wpt>
+	<wpt lat="41.579263" lon="73.016986">
+		<name>пер Шалдырак 3048</name>
+	</wpt>
+	<wpt lat="42.528207" lon="75.151446">
+		<name>оз Коль-Тор</name>
+	</wpt>
+	<wpt lat="41.657326" lon="73.114791">
+		<name>пер Каргыш</name>
+</gpx>

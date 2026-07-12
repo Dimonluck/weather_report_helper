@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="http://nakarte.me" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" version="1.1">
+	<metadata>
+		<time>2026-07-12T06:19:34.658Z</time>
+	</metadata>
+	<wpt lat="42.510955" lon="72.273736">
+		<name>ТАЛАС</name>
+	</wpt>
+	<wpt lat="42.441025" lon="72.273886">
+		<name>КОЗУЧАК</name>
+	</wpt>
+	<wpt lat="41.995885" lon="72.482132">
+		<name>КАРА-КУНГЕЙ</name>
+	</wpt>
+</gpx>
