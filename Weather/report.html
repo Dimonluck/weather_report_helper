@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang='ru'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+<title>Прогноз погоды – meteoblue</title>
+<style>
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 20px;
+            background: #f0f4f8;
+            color: #2c3e50;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+            color: #1a2b3c;
+        }
+        .subtitle {
+            font-size: 16px;
+            color: #5a6b7c;
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            padding: 5px 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 14px;
+            min-width: 600px;
+        }
+        th, td {
+            padding: 10px 12px;
+            border: 1px solid #dde4ec;
+            text-align: center;
+            white-space: nowrap;
+        }
+        th {
+            background: #2c3e50;
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        tr:nth-child(even) {
+            background: #f8fafc;
+        }
+        tr:hover {
+            background: #e9eff5;
+        }
+        .legend {
+            margin-top: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 20px 25px;
+        }
+        .legend h2 {
+            font-size: 20px;
+            margin-top: 0;
+            color: #1a2b3c;
+            border-bottom: 2px solid #e9eff5;
+            padding-bottom: 10px;
+        }
+        .legend-category {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a2b3c;
+            margin-top: 18px;
+            margin-bottom: 8px;
+            border-left: 4px solid #2980b9;
+            padding-left: 10px;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 6px 20px;
+            margin-bottom: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: baseline;
+            font-size: 14px;
+        }
+        .legend-item strong {
+            min-width: 160px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .legend-item span {
+            color: #5a6b7c;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #7f8c8d;
+            border-top: 1px solid #dde4ec;
+            padding-top: 15px;
+        }
+        .footer a {
+            color: #2980b9;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .picto-symbol {
+            font-size: 22px;
+        }
+    
+</style>
+</head>
+<body>
+<h1>📊 Прогноз погоды</h1>
+<div class='subtitle'>Пакет trend-day • 14 дней • от 14.07.2026 21:20</div>
+<div class='table-wrapper'>
+<table>
+<thead><tr>
+<th>Дата</th>
+<th>Название</th>
+<th>Тип</th>
+<th>Высота (м)</th>
+<th>Широта</th>
+<th>Долгота</th>
+<th>Температура макс (°C)</th>
+<th>Температура мин (°C)</th>
+<th>Осадки (мм)</th>
+<th>Вероятность осадков (%)</th>
+<th>Ветер макс (м/с)</th>
+<th>Прогнозируемость (%)</th>
+<th>Погода</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>21.07.2026</td>
+<td>ТАЛАС</td>
+<td>населённый пункт</td>
+<td>1264</td>
+<td>42.510955</td>
+<td>72.273736</td>
+<td>27.5</td>
+<td>18.0</td>
+<td>0</td>
+<td>34</td>
+<td>4.0</td>
+<td>49</td>
+<td class='picto-symbol'>🌤️</td>
+</tr>
+<tr>
+<td>21.07.2026</td>
+<td>ЖАНЫБЕК-БАТЫР</td>
+<td>населённый пункт</td>
+<td>1411</td>
+<td>42.442420</td>
+<td>72.293326</td>
+<td>27.9</td>
+<td>16.9</td>
+<td>0</td>
+<td>63</td>
+<td>7.0</td>
+<td>46</td>
+<td class='picto-symbol'>🌤️</td>
+</tr>
+<tr>
+<td>21.07.2026</td>
+<td>КОЗУРЧАК</td>
+<td>населённый пункт</td>
+<td>1413</td>
+<td>42.441025</td>
+<td>72.273886</td>
+<td>27.8</td>
+<td>16.9</td>
+<td>0</td>
+<td>63</td>
+<td>7.0</td>
+<td>46</td>
+<td class='picto-symbol'>🌤️</td>
+</tr>
+<tr>
+<td>21.07.2026</td>
+<td>мс1</td>
+<td>ночёвка</td>
+<td>1500</td>
+<td>42.415040</td>
+<td>72.285580</td>
+<td>27.3</td>
+<td>16.9</td>
+<td>0</td>
+<td>63</td>
+<td>7.0</td>
+<td>46</td>
+<td class='picto-symbol'>🌤️</td>
+</tr>
+<tr>
+<td>22.07.2026</td>
+<td>мс2</td>
+<td>ночёвка</td>
+<td>2675</td>
+<td>42.211771</td>
+<td>72.422909</td>
+<td>18.8</td>
+<td>10.1</td>
+<td>5</td>
+<td>78</td>
+<td>3.3</td>
+<td>42</td>
+<td class='picto-symbol'>☁️</td>
+</tr>
+<tr>
+<td>23.07.2026</td>
+<td>Пер. Терек</td>
+<td>перевал</td>
+<td>3376</td>
+<td>42.201214</td>
+<td>72.363171</td>
+<td>14.5</td>
+<td>6.8</td>
+<td>5.8</td>
+<td>76</td>
+<td>4.1</td>
+<td>39</td>
+<td class='picto-symbol'>☁️</td>
+</tr>
+<tr>
+<td>23.07.2026</td>
+<td>КЕСКЕН-ТЕБЕ</td>
+<td>населённый пункт</td>
+<td>1294</td>
+<td>42.015948</td>
+<td>72.468378</td>
+<td>30.5</td>
+<td>17.8</td>
+<td>8.1</td>
+<td>68</td>
+<td>2.2</td>
+<td>36</td>
+<td class='picto-symbol'>☁️</td>
+</tr>
+<tr>
+<td>23.07.2026</td>
+<td>КАРА-КУНГЕЙ</td>
+<td>населённый пункт</td>
+<td>1276</td>
+<td>41.995885</td>
+<td>72.482132</td>
+<td>31.3</td>
+<td>17.6</td>
+<td>3.0</td>
+<td>34</td>
+<td>2.1</td>
+<td>33</td>
+<td class='picto-symbol'>☁️</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class='legend'>
+<h2>📖 Полное описание всех параметров</h2>
+<div class='legend-category'>Облачность</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Облачность сред (%):</strong> <span>Средняя суточная облачность. Среднее значение облачности за день.</span></div>
+<div class='legend-item'><strong>Облачность макс (%):</strong> <span>Максимальная суточная облачность. Наибольший процент неба, закрытого облаками, в течение дня.</span></div>
+<div class='legend-item'><strong>Разброс облачности:</strong> <span>Разброс облачности. Показывает вариативность (неопределённость) прогноза облачности, основанную на ансамбле моделей. Большое значение означает меньшую уверенность в прогнозе.</span></div>
+<div class='legend-item'><strong>Облачность мин (%):</strong> <span>Минимальная суточная облачность. Наименьший процент неба, закрытого облаками, в течение дня.</span></div>
+</div>
+<div class='legend-category'>Осадки</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Доля снега (%):</strong> <span>Доля снега. Процент от общего количества осадков, выпавший в виде снега (а не дождя).</span></div>
+<div class='legend-item'><strong>Осадки (мм):</strong> <span>Суммарные осадки за день. Общее количество осадков (в мм), выпавших за сутки.</span></div>
+<div class='legend-item'><strong>Вероятность осадков (%):</strong> <span>Вероятность осадков. Вероятность (в процентах) того, что в этот день будут осадки.</span></div>
+<div class='legend-item'><strong>Разброс осадков:</strong> <span>Разброс осадков. Показывает вариативность прогноза осадков между разными моделями (ансамблем).</span></div>
+</div>
+<div class='legend-category'>Температура</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Температура мин (°C):</strong> <span>Минимальная суточная температура. Самая низкая температура за день (в °C).</span></div>
+<div class='legend-item'><strong>Температура сред (°C):</strong> <span>Средняя суточная температура. Среднее значение температуры за день.</span></div>
+<div class='legend-item'><strong>Температура макс (°C):</strong> <span>Максимальная суточная температура. Самая высокая температура за день (в °C).</span></div>
+<div class='legend-item'><strong>Разброс температуры:</strong> <span>Разброс температуры. Показывает вариативность прогноза температуры между разными моделями (ансамблем).</span></div>
+</div>
+<div class='legend-category'>Ветер</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Направление ветра (°):</strong> <span>Направление ветра. Направление, откуда дует ветер (в градусах: 0° — север, 90° — восток и т.д.).</span></div>
+<div class='legend-item'><strong>Ветер макс (м/с):</strong> <span>Максимальная скорость ветра за день (в м/с).</span></div>
+<div class='legend-item'><strong>Разброс ветра:</strong> <span>Разброс скорости ветра. Показывает вариативность прогноза ветра между разными моделями (ансамблем).</span></div>
+<div class='legend-item'><strong>Ветер сред (м/с):</strong> <span>Средняя скорость ветра за день (в м/с).</span></div>
+<div class='legend-item'><strong>Ветер мин (м/с):</strong> <span>Минимальная скорость ветра за день (в м/с).</span></div>
+</div>
+<div class='legend-category'>Давление</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Давление макс (гПа):</strong> <span>Максимальное давление на уровне моря за день (в гПа).</span></div>
+<div class='legend-item'><strong>Давление мин (гПа):</strong> <span>Минимальное давление на уровне моря за день (в гПа).</span></div>
+<div class='legend-item'><strong>Давление сред (гПа):</strong> <span>Среднее давление на уровне моря за день (в гПа).</span></div>
+</div>
+<div class='legend-category'>Влажность</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Влажность макс (%):</strong> <span>Максимальная относительная влажность за день (в %).</span></div>
+<div class='legend-item'><strong>Влажность мин (%):</strong> <span>Минимальная относительная влажность за день (в %).</span></div>
+<div class='legend-item'><strong>Влажность сред (%):</strong> <span>Средняя относительная влажность за день (в %).</span></div>
+</div>
+<div class='legend-category'>Прогнозируемость</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Класс прогнозируемости:</strong> <span>Класс прогнозируемости. Качественная (категориальная) оценка надёжности прогноза (например, 'высокая', 'средняя', 'низкая').</span></div>
+<div class='legend-item'><strong>Прогнозируемость (%):</strong> <span>Прогнозируемость. Оценка уверенности модели в прогнозе (в процентах). Чем выше значение, тем надёжнее прогноз.</span></div>
+</div>
+<div class='legend-category'>Солнечная радиация</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Солн. радиация (Вт·ч/м²):</strong> <span>Суммарная глобальная горизонтальная радиация. Общее количество солнечной энергии, падающей на горизонтальную поверхность за день (в Вт·ч/м²).</span></div>
+<div class='legend-item'><strong>Внеатм. радиация (Вт·ч/м²):</strong> <span>Суммарная внеатмосферная радиация. Количество солнечной энергии, поступающей на верхнюю границу атмосферы за день (в Вт·ч/м²).</span></div>
+</div>
+<div class='legend-category'>Пиктограмма</div>
+<div class='legend-grid'>
+<div class='legend-item'><strong>Погода:</strong> <span>Код пиктограммы. Числовой код, соответствующий определённому значку погоды (солнечно, облачно, дождь и т.д.). Используется для отображения иконки прогноза.</span></div>
+</div>
+</div>
+<div class='footer'>
+Источник: <a href='https://www.meteoblue.com' target='_blank'>meteoblue.com</a> • 
+Данные получены через API (trend-day)
+</div>
+</body>
+</html>
