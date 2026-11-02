@@ -5,6 +5,8 @@
 Универсальный анализатор погоды для велопохода.
 Собирает точки маршрута, запрашивает историческую погоду за указанные годы,
 строит CSV и интерактивный HTML-дашборд.
+Дополнительно: получает высоты, дедуплицирует точки, объединяет с GPX-файлами,
+приводит населённые пункты к верхнему регистру и сортирует данные по дате.
 """
 
 import os
@@ -13,7 +15,7 @@ import time
 import json
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from xml.etree import ElementTree as ET
 
 # ============================================================
@@ -21,16 +23,21 @@ from xml.etree import ElementTree as ET
 # ============================================================
 
 # ---- Какие годы анализировать ----
-YEARS = [2024, 2025]          # можно добавить 2023, 2026 и т.д.
+YEARS = [2024, 2025]
 
 # ---- Какие часы брать (местное время) ----
-HOURS = [0, 9, 13, 18]        # 0:00, 9:00, 13:00, 18:00
+HOURS = [0, 9, 13, 18]
+
+# ---- Часовой пояс (для запросов к Open-Meteo) ----
+# Возможные значения: список IANA time zones.
+# Примеры: "Asia/Tokyo", "Europe/Moscow", "America/New_York", "Europe/London", "UTC".
+# Полный список: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+TIMEZONE = "Asia/Tokyo"   # <-- измените на свой
 
 # ---- Пути к файлам ----
-INPUT_DIR = "input/"          # папка с исходными файлами
-OUTPUT_DIR = "output/"        # папка для результатов
+INPUT_DIR = "input/"
+OUTPUT_DIR = "output/"
 
-# Имена файлов (можно менять)
 PLAN_FILE = "План похода Тянь-Шань 2026.md"
 CAMPS_FILE = "ночевки.txt"
 VILLAGES_FILE = "населенка.txt"
@@ -41,6 +48,28 @@ PASSES_FILE = "ПП.txt"
 #      раскомментируйте строку ниже и укажите путь к нему.
 #      Тогда скрипт пропустит парсинг и сразу перейдет к запросу погоды.
 EXISTING_CSV = "input/points_full.csv"
+
+# ---- Дополнительный GPX с точками для погоды (например, Погода_Япония.txt) ----
+#      Если файл существует, скрипт создаст отдельный CSV с их высотами.
+#      Укажите None или закомментируйте, если не нужен.
+WEATHER_POINTS_GPX = "input/Погода_Япония.txt"
+
+# ---- Дополнительный CSV с точками (без дат) для объединения с основным маршрутом ----
+#      Например, weather_points_with_elevation.csv, созданный из WEATHER_POINTS_GPX.
+#      Скрипт автоматически назначит даты этим точкам (продолжая с последней даты
+#      из основного набора) или запросит начальную дату, если дат нет.
+WEATHER_POINTS_CSV = "output/weather_points_with_elevation.csv"
+
+# ---- Тип точки по умолчанию для дополнительных точек (если в CSV нет колонки 'type') ----
+DEFAULT_TYPE = "населённый пункт"
+
+# ---- Автоматически назначать даты дополнительным точкам ----
+#      True – продолжить с последней даты основного набора;
+#      False – запросить начальную дату у пользователя.
+AUTO_DATE_FROM_LAST = True
+
+# ---- Точность округления координат для дедупликации ----
+DEDUP_ROUND_DIGITS = 5
 
 # ============================================================
 #  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -69,11 +98,9 @@ def parse_plan_md(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         text = f.read()
     points = []
-    # Ночёвки: мс1: название (высота м)
     pattern = r'мс\d+[:：]\s*(.+?)\s*\((\d+)\s*м\)'
     for name, height in re.findall(pattern, text):
         points.append({'name': name.strip(), 'height': int(height), 'type': 'ночёвка'})
-    # Перевалы: Пер. название (высота м)
     pattern_pass = r'Пер\.\s*(.+?)\s*\((\d+)\s*м\)'
     for name, height in re.findall(pattern_pass, text):
         if not any(p['name'] == name for p in points):
@@ -91,10 +118,7 @@ def get_elevation(lat, lon):
         return None
 
 def get_historical_weather(lat, lon, year, month, day, hours, elevation=None):
-    """
-    Запрашивает почасовые данные для указанной даты и года.
-    Возвращает словарь {час: (temp, precip, wind)}.
-    """
+    """Запрашивает почасовые данные для указанной даты и года."""
     date_str = f"{year}-{month:02d}-{day:02d}"
     url = "https://archive-api.open-meteo.com/v1/archive"
     params = {
@@ -103,7 +127,7 @@ def get_historical_weather(lat, lon, year, month, day, hours, elevation=None):
         "start_date": date_str,
         "end_date": date_str,
         "hourly": "temperature_2m,precipitation,wind_speed_10m",
-        "timezone": "Asia/Bishkek",
+        "timezone": TIMEZONE,
         "models": "ecmwf_ifs"
     }
     if elevation is not None:
@@ -128,11 +152,11 @@ def get_historical_weather(lat, lon, year, month, day, hours, elevation=None):
         return {}
 
 # ============================================================
-#  ОСНОВНЫЕ ЭТАПЫ
+#  СБОР ТАБЛИЦЫ ТОЧЕК ИЗ ФАЙЛОВ
 # ============================================================
 
 def build_point_table(plan_file, camps_file, villages_file, passes_file):
-    """Собирает таблицу точек из файлов."""
+    """Собирает таблицу точек из GPX-файлов и плана."""
     camps = parse_gpx(camps_file)
     villages = parse_gpx(villages_file)
     passes = parse_gpx(passes_file)
@@ -157,13 +181,13 @@ def build_point_table(plan_file, camps_file, villages_file, passes_file):
             'lon': p['lon'],
             'height': info.get('height')
         })
-    # Населенные пункты
+    # Населенные пункты – сразу в верхнем регистре
     for p in villages:
         if any(r['name'] == p['name'] for r in rows):
             continue
         rows.append({
             'date': None,
-            'name': p['name'],
+            'name': p['name'].strip().upper(),
             'type': 'населённый пункт',
             'lat': p['lat'],
             'lon': p['lon'],
@@ -191,12 +215,128 @@ def build_point_table(plan_file, camps_file, villages_file, passes_file):
                 print(f"Высота для {row['name']}: {row['height']} м")
             time.sleep(0.2)
     df = pd.DataFrame(rows)
-    # Убираем строки без координат
     df = df[df['lat'].notna() & df['lon'].notna()]
     return df
 
+# ============================================================
+#  ОЧИСТКА И ДЕДУПЛИКАЦИЯ
+# ============================================================
+
+def clean_and_deduplicate(df, round_digits=5):
+    """
+    Приводит названия населённых пунктов к верхнему регистру
+    и удаляет дубли по координатам (с округлением).
+    """
+    if 'type' in df.columns:
+        mask = df['type'] == 'населённый пункт'
+        df.loc[mask, 'name'] = df.loc[mask, 'name'].astype(str).str.strip().str.upper()
+
+    if 'lat' in df.columns and 'lon' in df.columns:
+        df['_key'] = df['lat'].round(round_digits).astype(str) + '_' + df['lon'].round(round_digits).astype(str)
+        df_sorted = df.sort_values(by='height', na_position='last', ascending=False)
+        df_clean = df_sorted.drop_duplicates(subset='_key', keep='first')
+        df_clean = df_clean.drop(columns=['_key'])
+        print(f"Дедупликация: удалено {len(df) - len(df_clean)} дублирующихся точек.")
+        return df_clean
+    else:
+        print("ВНИМАНИЕ: не найдены колонки lat/lon, дедупликация не выполнена.")
+        return df
+
+# ============================================================
+#  ОБРАБОТКА ДОПОЛНИТЕЛЬНЫХ ТОЧЕК
+# ============================================================
+
+def process_weather_points(gpx_path, output_dir):
+    """Извлекает точки из GPX, запрашивает высоты и сохраняет CSV."""
+    points = parse_gpx(gpx_path)
+    if not points:
+        print("Файл с точками погоды не найден или пуст.")
+        return None
+    rows = []
+    for p in points:
+        elev = get_elevation(p['lat'], p['lon'])
+        if elev is not None:
+            elev = round(elev, 1)
+        rows.append({
+            'name': p['name'].strip().upper(),
+            'lat': p['lat'],
+            'lon': p['lon'],
+            'height': elev
+        })
+        print(f"{p['name']}: {elev} м" if elev is not None else f"{p['name']}: высота не получена")
+        time.sleep(0.3)
+    df = pd.DataFrame(rows)
+    csv_path = os.path.join(output_dir, 'weather_points_with_elevation.csv')
+    df.to_csv(csv_path, index=False, encoding='utf-8-sig', sep=';')
+    print(f"✅ CSV с высотами для точек погоды сохранён: {csv_path}")
+    return csv_path
+
+def merge_weather_points(df_main, weather_csv, default_type, auto_date=True):
+    """
+    Загружает дополнительный CSV, добавляет даты (если их нет)
+    и объединяет с основным DataFrame.
+    """
+    if not os.path.exists(weather_csv):
+        return df_main
+
+    df_extra = pd.read_csv(weather_csv, encoding='utf-8-sig', sep=';')
+    for col in ['name', 'lat', 'lon']:
+        if col not in df_extra.columns:
+            print(f"Ошибка: в {weather_csv} отсутствует колонка '{col}'")
+            return df_main
+
+    if 'type' not in df_extra.columns:
+        df_extra['type'] = default_type
+    if 'height' not in df_extra.columns:
+        df_extra['height'] = None
+
+    df_extra['name'] = df_extra['name'].astype(str).str.strip().str.upper()
+
+    has_date = 'date' in df_extra.columns and not df_extra['date'].isna().all()
+    if not has_date:
+        print("В дополнительном файле нет дат. Назначаем даты...")
+        last_date = None
+        if not df_main.empty and 'date' in df_main.columns:
+            dates_main = df_main['date'].dropna()
+            if not dates_main.empty:
+                try:
+                    last_date = max(dates_main.apply(lambda x: datetime.strptime(x, "%d.%m.%Y")))
+                except Exception:
+                    pass
+
+        if last_date is not None and auto_date:
+            print(f"Автоматическое назначение дат, начиная с {last_date.strftime('%d.%m.%Y')} + 1 день")
+            new_dates = []
+            current = last_date + timedelta(days=1)
+            for _ in range(len(df_extra)):
+                new_dates.append(current.strftime("%d.%m.%Y"))
+                current += timedelta(days=1)
+            df_extra['date'] = new_dates
+        else:
+            print("В основном наборе нет дат или AUTO_DATE_FROM_LAST = False.")
+            start_str = input("Введите начальную дату в формате ДД.ММ.ГГГГ (например, 01.01.2025): ")
+            try:
+                start_date = datetime.strptime(start_str, "%d.%m.%Y")
+            except Exception:
+                print("Некорректный формат. Использую сегодняшнюю дату.")
+                start_date = datetime.now()
+            new_dates = []
+            current = start_date
+            for _ in range(len(df_extra)):
+                new_dates.append(current.strftime("%d.%m.%Y"))
+                current += timedelta(days=1)
+            df_extra['date'] = new_dates
+
+    df_combined = pd.concat([df_main, df_extra], ignore_index=True)
+    print(f"Добавлено {len(df_extra)} точек из {weather_csv}. Всего точек: {len(df_combined)}")
+    return df_combined
+
+# ============================================================
+#  ЗАПРОС ПОГОДЫ
+# ============================================================
+
 def fetch_weather_for_df(df, years, hours):
-    """Добавляет в DataFrame колонки с погодой."""
+    """Добавляет в DataFrame колонки с погодой для каждого года и часа."""
     for year in years:
         for hour in hours:
             df[f't{hour}_{year}'] = None
@@ -208,8 +348,8 @@ def fetch_weather_for_df(df, years, hours):
             print(f"Пропускаем {row['name']} – нет даты")
             continue
         try:
-            date_obj = datetime.strptime(row['date'], "%d.%m.%Y")
-        except:
+            date_obj = datetime.strptime(str(row['date']), "%d.%m.%Y")
+        except Exception:
             continue
         day, month = date_obj.day, date_obj.month
         lat, lon = row['lat'], row['lon']
@@ -227,7 +367,7 @@ def fetch_weather_for_df(df, years, hours):
             time.sleep(0.5)
         time.sleep(0.3)
 
-    # Вычисляем min/max для каждого часа
+    # Min/max по годам для каждого часа
     for hour in hours:
         t_cols = [f't{hour}_{year}' for year in years]
         p_cols = [f'p{hour}_{year}' for year in years]
@@ -240,21 +380,32 @@ def fetch_weather_for_df(df, years, hours):
         df[f'w{hour}_max'] = df[w_cols].max(axis=1)
     return df
 
+# ============================================================
+#  ДАШБОРД
+# ============================================================
+
 def generate_dashboard_from_df(df, output_html, output_csv=None):
-    """Генерирует интерактивный дашборд из DataFrame."""
+    """Генерирует интерактивный HTML-дашборд из DataFrame."""
     if output_csv:
         df.to_csv(output_csv, index=False, encoding='utf-8-sig', sep=';')
         print(f"CSV сохранён: {output_csv}")
 
-    # Подготовка данных для JavaScript
     df_clean = df[df['date'].notna()].copy()
     if df_clean.empty:
         print("Нет данных с датами, дашборд не будет построен.")
         return
-    df_clean['date_sort'] = df_clean['date'].apply(lambda x: datetime.strptime(x, "%d.%m.%Y"))
+
+    df_clean['date_sort'] = df_clean['date'].apply(lambda x: datetime.strptime(str(x), "%d.%m.%Y"))
     df_clean = df_clean.sort_values('date_sort').drop('date_sort', axis=1)
-    dates = sorted(df_clean['date'].unique(), key=lambda x: datetime.strptime(x, "%d.%m.%Y"))
-    types = sorted(df_clean['type'].unique())
+
+    dates = sorted(df_clean['date'].unique(), key=lambda x: datetime.strptime(str(x), "%d.%m.%Y"))
+
+    # ---- Динамические типы из CSV ----
+    if 'type' in df_clean.columns:
+        types = sorted([str(t).strip() for t in df_clean['type'].dropna().unique() if str(t).strip()])
+    else:
+        types = []
+
     points = sorted(df_clean['name'].unique())
     df_json = df_clean.to_json(orient='records', force_ascii=False)
 
@@ -306,9 +457,7 @@ def generate_dashboard_from_df(df, output_html, output_csv=None):
         <label for="typeFilter">Тип:</label>
         <select id="typeFilter">
             <option value="all">Все</option>
-            <option value="ночёвка">Ночёвки</option>
-            <option value="перевал">Перевалы</option>
-            <option value="населённый пункт">Населённые пункты</option>
+            {''.join(f'<option value="{t}">{t}</option>' for t in types)}
         </select>
         <label for="pointSelect">Точка:</label>
         <select id="pointSelect"><option value="">-- все точки --</option>
@@ -469,11 +618,40 @@ def generate_dashboard_from_df(df, output_html, output_csv=None):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # --- Шаг 1: Получить таблицу точек ---
+    # ---- Обработка GPX с точками погоды ----
+    weather_csv_path = None
+    if 'WEATHER_POINTS_GPX' in globals() and WEATHER_POINTS_GPX and os.path.exists(WEATHER_POINTS_GPX):
+        print("Обработка дополнительного файла с точками погоды:", WEATHER_POINTS_GPX)
+        weather_csv_path = process_weather_points(WEATHER_POINTS_GPX, OUTPUT_DIR)
+    else:
+        if 'WEATHER_POINTS_CSV' in globals() and WEATHER_POINTS_CSV and os.path.exists(WEATHER_POINTS_CSV):
+            weather_csv_path = WEATHER_POINTS_CSV
+
+    # ---- Шаг 1: Таблица точек ----
     if 'EXISTING_CSV' in globals() and os.path.exists(EXISTING_CSV):
         print("Использую готовый CSV:", EXISTING_CSV)
         df = pd.read_csv(EXISTING_CSV, encoding='utf-8-sig', sep=';')
-        # Убедимся, что все нужные колонки есть
+
+        # Страховка: колонка 'type' должна быть
+        if 'type' not in df.columns:
+            df['type'] = 'точка'
+            print("Колонка 'type' отсутствовала — добавлена со значением 'точка'.")
+
+        # Страховка: колонка 'height'
+        if 'height' not in df.columns:
+            df['height'] = None
+
+        # Дозапрашиваем недостающие высоты
+        missing_height = df['height'].isna()
+        if missing_height.any():
+            print(f"Обнаружено {missing_height.sum()} точек без высоты. Запрашиваю...")
+            for idx, row in df[missing_height].iterrows():
+                if not pd.isna(row['lat']) and not pd.isna(row['lon']):
+                    elev = get_elevation(row['lat'], row['lon'])
+                    if elev is not None:
+                        df.at[idx, 'height'] = round(elev, 1)
+                        print(f"Высота для {row['name']}: {df.at[idx, 'height']} м")
+                    time.sleep(0.3)
     else:
         print("Сбор точек маршрута из файлов...")
         plan_path = os.path.join(INPUT_DIR, PLAN_FILE)
@@ -484,27 +662,49 @@ def main():
         if df.empty:
             print("Не найдено ни одной точки. Проверьте файлы.")
             return
-        # Сохраняем промежуточный CSV
         csv_raw = os.path.join(OUTPUT_DIR, 'points_raw.csv')
         df.to_csv(csv_raw, index=False, encoding='utf-8-sig', sep=';')
         print(f"Собрано {len(df)} точек. Сохранено в {csv_raw}")
 
-    # --- Шаг 2: Запросить погоду ---
+    # ---- Шаг 1.5: Объединить с дополнительными точками ----
+    if weather_csv_path and os.path.exists(weather_csv_path):
+        df = merge_weather_points(df, weather_csv_path, DEFAULT_TYPE, AUTO_DATE_FROM_LAST)
+
+    # ---- Шаг 1.6: Очистка и дедупликация ----
+    print("Выполняю очистку данных и дедупликацию...")
+    df_clean = clean_and_deduplicate(df, round_digits=DEDUP_ROUND_DIGITS)
+
+    cleaned_csv_path = os.path.join(OUTPUT_DIR, 'points_cleaned.csv')
+    df_clean.to_csv(cleaned_csv_path, index=False, encoding='utf-8-sig', sep=';')
+    print(f"✅ Очищенный CSV сохранён: {cleaned_csv_path}")
+
+    if 'EXISTING_CSV' in globals() and EXISTING_CSV:
+        df_clean.to_csv(EXISTING_CSV, index=False, encoding='utf-8-sig', sep=';')
+        print(f"Базовый CSV обновлён (очищенный): {EXISTING_CSV}")
+
+    # ---- Шаг 2: Запрос погоды ----
     print("Запрос исторической погоды...")
-    df = fetch_weather_for_df(df, YEARS, HOURS)
-    # Сохраняем полный CSV
+    df_final = fetch_weather_for_df(df_clean, YEARS, HOURS)
+
+    # ---- Сортировка по дате ----
+    if 'date' in df_final.columns:
+        df_final['_date_dt'] = pd.to_datetime(df_final['date'], format='%d.%m.%Y', errors='coerce')
+        df_final = df_final.sort_values(by='_date_dt', na_position='last')
+        df_final = df_final.drop(columns=['_date_dt'])
+        print("✅ Данные отсортированы по дате.")
+
     csv_full = os.path.join(OUTPUT_DIR, 'points_full.csv')
-    df.to_csv(csv_full, index=False, encoding='utf-8-sig', sep=';')
+    df_final.to_csv(csv_full, index=False, encoding='utf-8-sig', sep=';')
     print(f"Полный CSV сохранён: {csv_full}")
 
-    # --- Шаг 3: Сгенерировать дашборд ---
+    # ---- Шаг 3: Дашборд ----
     html_file = os.path.join(OUTPUT_DIR, 'dashboard.html')
-    generate_dashboard_from_df(df, html_file, output_csv=None)  # CSV уже сохранён
+    generate_dashboard_from_df(df_final, html_file, output_csv=None)
 
     print("\n✅ Всё готово!")
-    print(f"  - CSV с данными: {csv_full}")
-    print(f"  - Интерактивный отчёт: {html_file}")
-    print("  Откройте HTML в браузере для просмотра.")
+    print(f"  - Очищенный CSV: {cleaned_csv_path}")
+    print(f"  - Полный CSV с погодой: {csv_full}")
+    print(f"  - Дашборд: {html_file}")
 
 if __name__ == "__main__":
     main()
