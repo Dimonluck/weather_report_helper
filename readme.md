@@ -31,6 +31,8 @@
 - **`weather_points_with_elevation.csv`** (опционально) — CSV с высотами для дополнительных точек из GPX.
 
 ---
+![пример отчета](dashboard_example.png)
+---
 
 ## 🚀 Быстрый старт
 
